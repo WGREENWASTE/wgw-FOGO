@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f6f43">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="FOGO">
+<title>WGW FOGO</title>
+<style>
+:root{--theme:#1f6f43;--accent:#4caf50;--bg:#f4f7f5;--line:#d9e4dd;--text:#183126;--muted:#65736b;--red:#b42318}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+header{background:var(--theme);color:white;padding:15px 16px;position:sticky;top:0;z-index:5}
+header h1{font-size:19px;margin:0} header p{font-size:12px;margin:3px 0 0;opacity:.9}
+main{max-width:700px;margin:auto;padding:14px 14px 60px}.card{background:white;border:1px solid var(--line);border-radius:15px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:12px;font-weight:bold;color:var(--muted);margin:10px 0 5px}
+input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;background:#fff}
+textarea{min-height:74px}button{border:0;border-radius:12px;padding:13px 14px;font-weight:700}.big{width:100%;font-size:22px;padding:25px 14px;background:var(--theme);color:white}
+.secondary{background:#edf3ef;color:var(--theme)}.danger{background:#fdecea;color:var(--red)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.choicegrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.choice{background:#f8faf9;border:1px solid var(--line);color:var(--text);min-height:56px}
+.choice.selected{border:2px solid var(--theme);background:#eef6f1}.small{font-size:12px;color:var(--muted);line-height:1.45}.hidden{display:none}
+.thumb{width:100%;max-height:210px;object-fit:cover;border-radius:10px;margin-top:10px}.record{border-left:5px solid var(--theme)}
+@media(max-width:540px){.choicegrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>Warrnambool Greenwaste</h1><p>FOGO contamination recorder</p></header>
+<main>
+<div class="card">
+<label>Driver</label><select id="driver"><option>Shane</option><option>Jim</option><option>Glenn</option><option>Toby</option></select>
+<label>Truck</label><select id="truck"><option>FOGO Truck 1</option><option>FOGO Truck 2</option><option>Backup Truck</option></select>
+<label>Route</label><input id="route" placeholder="e.g. Monday Route 1">
+</div>
+
+<div class="card"><button class="big" onclick="startRecord()">RECORD CONTAMINATED BIN</button><p class="small" style="text-align:center">Use only when a contaminated bin is found.</p></div>
+
+<div id="form" class="hidden">
+<div class="card">
+<h3>Location</h3><div id="gps" class="small">GPS not captured.</div>
+<label>Address</label><input id="address" placeholder="Confirm or enter property address">
+<div class="actions"><button class="secondary" onclick="captureGps()">Refresh GPS</button></div>
+</div>
+<div class="card">
+<h3>Photo</h3><input id="photo" type="file" accept="image/*" capture="environment"><img id="preview" class="thumb hidden">
+</div>
+<div class="card">
+<h3>Contamination type</h3><div id="types" class="choicegrid"></div>
+<label>Notes</label><textarea id="notes" placeholder="Optional details"></textarea>
+<label><input id="sticker" type="checkbox" style="width:auto"> Sticker applied</label>
+<label><input id="notemptied" type="checkbox" style="width:auto" checked> Bin not emptied</label>
+<div class="actions"><button class="big" style="font-size:17px;padding:16px" onclick="saveRecord()">SAVE RECORD</button><button class="danger" onclick="cancel()">Cancel</button></div>
+</div>
+</div>
+
+<div class="card">
+<h3>Send records</h3>
+<p class="small">At the end of the shift, export the report and use the iPhone Share button to send it to Shane or Toby by Mail or Messages.</p>
+<div class="actions"><button class="secondary" onclick="exportCSV()">EXPORT TODAY'S REPORT</button><button class="secondary" onclick="shareSummary()">SHARE SUMMARY</button></div>
+</div>
+<div id="records"></div>
+</main>
+<script>
+const KEY='wgw-fogo-records-v1';
+let gpsData=null,photoData='',selected=[];
+const TYPES=['Bagged rubbish','Food waste','Soft plastics','Clothing or textiles','Polystyrene','Building material','Glass or dangerous item','Excessive contamination','Other'];
+document.getElementById('types').innerHTML=TYPES.map((x,i)=>`<button class="choice" id="t${i}" onclick="toggleType(${i})">${x}</button>`).join('');
+document.getElementById('photo').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;photoData=await resize(f);preview.src=photoData;preview.classList.remove('hidden')});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+function startRecord(){form.classList.remove('hidden');captureGps();form.scrollIntoView({behavior:'smooth'})}
+function captureGps(){gps.textContent='Capturing GPS...';navigator.geolocation?.getCurrentPosition(p=>{gpsData={lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy};gps.textContent=`GPS: ${gpsData.lat.toFixed(6)}, ${gpsData.lng.toFixed(6)} · accuracy about ${Math.round(gpsData.accuracy)} m`},()=>gps.textContent='GPS unavailable. Enter the address manually.',{enableHighAccuracy:true,timeout:12000})}
+function toggleType(i){const n=TYPES[i],b=document.getElementById('t'+i);if(selected.includes(n)){selected=selected.filter(x=>x!==n);b.classList.remove('selected')}else{selected.push(n);b.classList.add('selected')}}
+function resize(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const s=Math.min(1,1000/im.width),c=document.createElement('canvas');c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.72))};im.src=r.result};r.readAsDataURL(f)})}
+function getAll(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch{return[]}}
+function saveRecord(){if(!address.value.trim())return alert('Enter or confirm the address.');if(!photoData)return alert('Take a photo.');if(!selected.length)return alert('Select contamination type.');const n=new Date(),r={date:n.toISOString().slice(0,10),time:n.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),driver:driver.value,truck:truck.value,route:route.value,address:address.value.trim(),gps:gpsData,types:selected,notes:notes.value.trim(),sticker:sticker.checked,notEmptied:notemptied.checked,photo:photoData};const a=getAll();a.unshift(r);localStorage.setItem(KEY,JSON.stringify(a));alert('Saved.');cancel();render()}
+function cancel(){form.classList.add('hidden');gpsData=null;photoData='';selected=[];address.value='';notes.value='';photo.value='';preview.classList.add('hidden');sticker.checked=false;notemptied.checked=true;TYPES.forEach((_,i)=>document.getElementById('t'+i).classList.remove('selected'))}
+function exportCSV(){const d=new Date().toISOString().slice(0,10),a=getAll().filter(r=>r.date===d);if(!a.length)return alert('No records today.');const rows=[['Date','Time','Address','Driver','Truck','Route','Types','Sticker','Not Emptied','Latitude','Longitude','Notes'],...a.map(r=>[r.date,r.time,r.address,r.driver,r.truck,r.route,r.types.join('; '),r.sticker?'Yes':'No',r.notEmptied?'Yes':'No',r.gps?.lat||'',r.gps?.lng||'',r.notes])];const csv=rows.map(x=>x.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n');const b=new Blob([csv],{type:'text/csv'}),u=URL.createObjectURL(b),el=document.createElement('a');el.href=u;el.download='WGW-FOGO-'+d+'.csv';el.click();URL.revokeObjectURL(u)}
+async function shareSummary(){const d=new Date().toISOString().slice(0,10),a=getAll().filter(r=>r.date===d),text=`WGW FOGO contamination report - ${d}\nContaminated bins: ${a.length}\nStickered: ${a.filter(r=>r.sticker).length}\nNot emptied: ${a.filter(r=>r.notEmptied).length}`;if(navigator.share)await navigator.share({title:'WGW FOGO report',text});else{await navigator.clipboard.writeText(text);alert('Summary copied.')}}
+function render(){const a=getAll(),d=new Date().toISOString().slice(0,10),t=a.filter(r=>r.date===d);records.innerHTML=t.map(r=>`<div class="card record"><b>${r.address}</b><div class="small">${r.time} · ${r.driver} · ${r.types.join(', ')}</div><img class="thumb" src="${r.photo}"></div>`).join('')||'<div class="card small">No records today.</div>'}
+render();
+</script>
+</body></html>
