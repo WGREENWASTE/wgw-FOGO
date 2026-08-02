@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="FOGO">
-<title>WGW FOGO v2.0</title>
+<title>WGW FOGO v2.02</title>
 <style>
 :root{--theme:#1f6f43;--accent:#4caf50;--bg:#f4f7f5;--line:#d9e4dd;--text:#183126;--muted:#65736b;--red:#b42318}
 *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
@@ -27,7 +27,7 @@ textarea{min-height:74px}button{border:0;border-radius:12px;padding:13px 14px;fo
 </style>
 </head>
 <body>
-<header><h1>Warrnambool Greenwaste</h1><p>FOGO contamination recorder · v2.0</p></header>
+<header><h1>Warrnambool Greenwaste</h1><p>FOGO contamination recorder · v2.02</p></header>
 <main>
 <div class="card">
 <label>Driver</label><select id="driver"><option>Shane</option><option>Jim</option><option>Glenn</option><option>Toby</option></select>
@@ -42,7 +42,7 @@ textarea{min-height:74px}button{border:0;border-radius:12px;padding:13px 14px;fo
 <h3>Location</h3><div id="gps" class="small">GPS not captured.</div>
 <label>Bin Serial Number</label>
 <div class="actions" style="margin-top:0">
-<input id="serialNumber" inputmode="numeric" autocomplete="off" placeholder="Enter serial number" style="flex:1;min-width:190px">
+<input id="serialNumber" type="text" autocapitalize="characters" autocomplete="off" placeholder="Enter serial number (e.g. FO955510)" style="flex:1;min-width:190px">
 <button class="secondary" type="button" onclick="lookupSerial()">LOOKUP</button>
 </div>
 <div id="serialResult" class="lookup-result hidden"></div>
@@ -79,7 +79,7 @@ document.getElementById('types').innerHTML=TYPES.map((x,i)=>`<button class="choi
 document.getElementById('photo').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;photoData=await resize(f);preview.src=photoData;preview.classList.remove('hidden')});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('service-worker.js').catch(()=>{});
 
-function normaliseSerial(value){const cleaned=String(value||'').trim().replace(/\s+/g,'');return cleaned}
+function normaliseSerial(value){return String(value||'').trim().replace(/\s+/g,'').toUpperCase()}
 function lookupSerial(){
   const serialEl=document.getElementById('serialNumber');
   const resultEl=document.getElementById('serialResult');
@@ -88,8 +88,16 @@ function lookupSerial(){
   resultEl.className='lookup-result hidden';
   resultEl.innerHTML='';
   if(!entered)return alert('Enter the bin serial number.');
-  const key=entered.replace(/^0+/,'')||'0';
-  const matches=(window.WGW_BIN_LOOKUP&&window.WGW_BIN_LOOKUP[entered])||(window.WGW_BIN_LOOKUP&&window.WGW_BIN_LOOKUP[key])||[];
+  const withoutFo=entered.replace(/^FO/i,'');
+  const numericKey=withoutFo.replace(/^0+/,'')||'0';
+  const candidates=[entered,withoutFo,numericKey,'FO'+withoutFo,'FO'+numericKey];
+  let matches=[];
+  for(const candidate of candidates){
+    if(window.WGW_BIN_LOOKUP&&window.WGW_BIN_LOOKUP[candidate]){
+      matches=window.WGW_BIN_LOOKUP[candidate];
+      break;
+    }
+  }
   if(!matches.length){
     resultEl.className='lookup-result lookup-warn';
     resultEl.innerHTML='<b>Serial not found</b><div class="small">Confirm the number or continue using GPS/manual address.</div>';
@@ -100,7 +108,11 @@ function lookupSerial(){
   document.getElementById('address').value=assetData.a||'';
   const duplicateNote=matches.length>1?`<div class="small"><b>${matches.length} database matches.</b> Confirm the address before saving.</div>`:'';
   resultEl.className='lookup-result lookup-ok';
-  resultEl.innerHTML=`<b>Bin found</b><div>${assetData.a||'Address unavailable'}</div><div class="small">${assetData.n||'FOGO Receptacle'}${assetData.z?' · '+assetData.z:''} · Serial ${assetData.s}</div>${duplicateNote}`;
+  resultEl.innerHTML=`<b>✓ FOGO BIN FOUND</b>
+  <div style="margin-top:6px"><b>Serial:</b> ${assetData.s}</div>
+  <div><b>Address:</b> ${assetData.a||'Address unavailable'}</div>
+  <div><b>Size:</b> ${assetData.z||'Not listed'}</div>
+  <div class="small">${assetData.n||'FOGO Receptacle'}</div>${duplicateNote}`;
 }
 
 function startRecord(){form.classList.remove('hidden');captureGps();form.scrollIntoView({behavior:'smooth'})}
